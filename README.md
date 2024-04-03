@@ -23,7 +23,7 @@ El proyecto consiste en la implementación de una infraestructura en la nube uti
 
 ### Diagrama de Arquitectura
 
-![diagrama](aws-arquitectura.png)
+![diagrama](AWS.png)
 
 ## Entorno de desarrollo
 
