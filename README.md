@@ -4,22 +4,17 @@
 El proyecto consiste en la implementación de una infraestructura en la nube utilizando los servicios de Amazon Web Services (AWS) y gestionándolos como código utilizando Terraform. El objetivo principal es crear una infraestructura escalable, segura y eficiente para alojar aplicaciones y datos.
 
 ## Servicios
-- VPC (Virtual Private Cloud): Se creará una VPC en la región US-east-1 de AWS. Se le asignará un rango de CIDR de 10.0.0.0/16.
+- VPC (Virtual Private Cloud):
 - Subnets:
-  1. Subred Pública:
-     - Se configurará una subred pública dentro de la VPC.
-     - Esta subred estará asociada a una tabla de ruteo que incluirá una ruta hacia el Internet Gateway, permitiendo el acceso a Internet desde los recursos desplegados en esta subred.
-     - Su rango de CIDR será 10.0.1.0/24.
-  2. Subred Privada:
-     - Se configurará una subred privada dentro de la VPC.
-     - Esta subred estará aislada de Internet y no tendrá una ruta directa al Internet Gateway.
-     - Su rango de CIDR será 10.0.0.0/24.
-     - Los recursos desplegados en esta subred no tendrán direcciones IP públicas y estarán protegidos del acceso no autorizado desde Internet.
-- Internet Gateway: Se configurará un Internet Gateway para permitir la comunicación bidreccional entre la infraestructura en la nube y la Internet pública.
-- Tabla de Ruteo: Se creará una tabla de ruteo para dirigir el tráfico entre subredes privadas y públicas, asi como reglas para el acceso a Internet a través del Internet Gateway.
+  1. Subred Pública.
+
+  2. Subred Privada.
+  
+- Internet Gateway.
+- Tabla de Ruteo.
 - EC2 Instances: Se crearán dos instancias EC2 para alojar las aplicaciones o servicios deseados.
-- Amazon RDS Instances: Se configurarán dos instancias de Amazon RDS (Relational Database Service) para gestionar bases de datos relacionales.
-- S3 Buckets: Se crearán dos buckets S3 para almacenar objetos como archivos estáticos, imágenes, archivos de configuración.
+- Amazon RDS Instances.
+- S3 Buckets.
 
 ### Diagrama de Arquitectura
 
@@ -36,6 +31,9 @@ El proyecto consiste en la implementación de una infraestructura en la nube uti
 
 - Paso 1: Configuración del proveedor AWS
 
+	- El primer paso será indicar con que proveedor de servicios en la nube vamos a trabajar en este caso sera `AWS` (Amazon Web Services), dentro de este proveedor utilizaremos la región `us-east-1` para desplegar nuestros recursos para la creación de la infraestructura. 
+	- A continuación de detalla la creación del mismo mediate terraform:
+
 Script:
 
 ```
@@ -44,13 +42,11 @@ provider "aws" {
 }
 ```
 
-Descripción de parámetros:
 
-- `provider "aws"`: Esto indica que todos los recursos que se creen en este archivo pertenecerán a `AWS`.
+- Paso 2: Creación de una VPC (Virtual Private Cloud) en AWS.
 
-- `region = "us-east-1"`: Esta línea especifica la región de `AWS` en la que se crearán los recursos. 
-
-- Paso 2: Creación de una VPC(Virtual Private Cloud) en AWS.
+	- El segundo paso será la creación de una `VPC` (Virtual Private Cloud) en `AWS`con el nombre `MiVPC`, esta `VPC` nos va a permitir aislar nuestra red en un entorno de red virtualizado y aislado en la nube de AWS.
+	- Dentro de la misma configuramos nuestro rango de direcciones IP  `"10.0.0.0/16"` que se le asignaran a los recursos de `AWS` que en los siguientes pasos se detallarán.
 
 Script:
 
@@ -64,18 +60,12 @@ resource "aws_vpc" "istea_vpc" {
     }
 }
 ```
-Descripción de parámetros:
-
-- `resource "aws_vpc" "istea_vpc"`: Definimos el recurso de tipo VPC en aws seguido del nombre `istea_vpc` como identificador único para este recurso.
-
-- `cidr_block = "10.0.0/16"`: Se especifica el rango de direcciones IP que se asignará a la VPC.
-
-- `instance_tenancy = "default"`:
-
-- `tags = { Name = "MiVPC" }`: Nombre de etiqueta para el recurso de VPC.
 
 
 - Paso 3: Creación de una subred pública en AWS.
+
+	- El tercer paso será la creación de una subred pública en `AWS` con el nombre de `"RedPublica"` que es una "subdivsion" de nuestra VPC que hemos creado en el paso anterior, en esta subred pública estarán alojados los servicios `EC2` y `RDS`, con el objetivo de que estos servicios tengan acceso a internet y que también puedan recibir el tráfico directo desde Internet.
+	- Su rango de direcciones IP será de `"10.0.1.0/24"`  y su zona de disponibilidad será `"us-east-1a"` que son ubicaciones físicas separadas dentro de una región, esto nos dará beneficios de aislamiento, redundancia y tolerancia a fallos.
 
 Script:
 
@@ -93,6 +83,11 @@ resource "aws_subnet" "publica" {
 
 - Paso 4. Creación de una subred privada en AWS.
 
+	- El cuarto paso será la creación de la subred privada en `AWS` con el nombre `"RedPrivada"`  que al igual que la subred pública creada en el paso anterior va a estar dentro de la `VPC` con la diferencia que esta subred privada no tendrá acceso directo a Internet, sino se conectará a atraves de un NAT gateway, esto nos proporcionará más seguridad al ocultar las direcciones IP de nuestros recursos que tengamos en la subred.
+	- Su rango de direcciones IP será de `"10.0.2.0/24"` y su zona de disponibilidad será `"us-east-1b"`.
+
+Script:
+	
 ```
 resource "aws_subnet" "privada" {
     vpc_id = aws_vpc.istea_vpc.id
@@ -107,30 +102,21 @@ resource "aws_subnet" "privada" {
 
 - Paso 5. Creación de un Internet Gateway en AWS.
 
+	- El quinto paso será la creacion de un `Internet Gateway` en AWS que funcionará como un punto de conexión entre la `VPC` y el internet público. Esto nos va a permitir que los recursos que tengamos en nuestra subred pública se comuniquen de forma bidireccional con recursos externos a través de internet.
+
+Script:
+
 ```
 resource "aws_internet_gateway" "istea_igw" {
     vpc_id = aws_vpc.istea_vpc.id
 }
 ```
 
-- Paso 6. Creación de un NAT Gateway en AWS.
+- Paso 6. Definimos tabla de enrutamiento
 
-```
-resource "aws_nat_gateway" "istea_nat_gateway" {
-    allocation_id = aws_eip.istea_eip.id
-    subnet_id = aws_subnet.privada.id
-}
-```
+	- El sexto paso será definir la tabla de enrutamiento en la `VPC` con el nombre de `"Tabla de enrutamiento pública"`, con el fin de dirigir el tráfico de red desde la subred pública hacia el `"Internet Gateway"`  que se creo en el paso anterior.
 
-- Paso 7. Creación de una dirección IP elástica.
-
-```
-resource "aws_eip" "istea_eip" {
-    domain = "vpc"
-}
-```
-
-- Paso 8. Definimos tabla de enrutamiento
+Script:
 
 ```
 resource "aws_route_table" "publica" {
@@ -142,7 +128,11 @@ resource "aws_route_table" "publica" {
 }
 ```
 
-- Paso 9. Definimos una ruta en una tabla de ruteo en AWS para permitir tanto la entrada y salida de datos hacia internet.
+- Paso 7. Definimos una ruta en una tabla de ruteo en AWS.
+
+	- El septimo paso será la asignación de una ruta para permitir el acceso a Internet desde la subred pública, esta ruta se agrega a la tabla de enrutamiento creada en el paso anterior. Al crear esta ruta se especifica que todo el tráfico con destino a cualquier direccion IP (0.0.0.0/0) debe dirigirse al `Internet Gateway`. Esto nos va a permitir que los recursos que tengamos en nuestra subred pública puedan comunicarse con recursos que esten fuera de la `VPC`.
+
+Script:
 
 ```
 resource "aws_route" "acceso_internet" {
@@ -152,7 +142,43 @@ resource "aws_route" "acceso_internet" {
 }
 ```
 
+- Paso 8. Creación de un NAT Gateway en AWS.
+
+	- El octavo paso será la implementación de un `NAT Gateway` en AWS, que va a actuar como intermediario entre los recursos que tengamos en nuestra subred privada y los recursos en Internet. Como función principal es la de traducir las direcciones IP privadas de los servicios que tengamos en nuestra subred privada a una dirección IP pública antes de enviar el tráfico a Internet. Esto nos va a garantizar que nuestros servicios accedan a recursos en internet sin exponer sus direcciones IP privadas.
+	
+
+Script:
+
+```
+resource "aws_nat_gateway" "istea_nat_gateway" {
+    allocation_id = aws_eip.istea_eip.id
+    subnet_id = aws_subnet.privada.id
+}
+```
+
+- Paso 9. Creación de una dirección IP elástica.
+
+	- El noveno paso será la creación de una IP elástica en `AWS`, que es una IP pública estatica que en este caso va a estar asociada a la `VPC` que hemos creado, y que va a ser utilizada por el `NAT Gateway` para permitir la comunicación de salida desde la subred privada a internet.
+
+Script:
+
+```
+resource "aws_eip" "istea_eip" {
+    domain = "vpc"
+}
+```
+
+
+
+
+
 - Paso 10. Creación de EC2 pública en AWS
+
+	- En el decimo paso implementamos una instancia `EC2` con el nombre `"Instancia_Publica"` que es un servidor virtual en el cual se pueden ejecutar aplicaciones y servicios. Este servicio va a estar asociado a la subred pública que ya hemos creado. 
+	- Utilizamos la `AMI: "ami-080e1f13689e07408"` (Amazon Machine Image), basada en Ubuntu que nos servirá como el sistema operativo de nuestra instancia.
+	- También se especifica que se utilizará una clave `SSH` para acceder a la instancia de forma segura.
+
+Script:
 
 ```
 resource "aws_instance" "instance_publica" {
@@ -170,6 +196,12 @@ resource "aws_instance" "instance_publica" {
 
 - Paso 11. Creación de una EC2 privada en AWS.
 
+  - En este paso creamos otra instancia `EC2` con el nombre `"Instancia Privada"`, esta instancia estará asociada a la subred privada que se creo anteriormente, utilizamos la misma `AMI` basada en Ubuntu como sistema operativo base y el mismo tipo de procesamiento `t2.micro`, pero con la diferencia de que esta instancia `EC2` no tendrá una IP pública asignada, esto quiere decir que no será accesible directamente desde internet.
+
+
+    Script:
+
+
 ```
 resource "aws_instance" "instance_privada" {
     ami = "ami-080e1f13689e07408" # AMI de la instancia
@@ -184,6 +216,10 @@ resource "aws_instance" "instance_privada" {
 
 - Paso 12. Creación de Bucket S3 público en AWS.
 
+	- En este paso se crea un Bucket S3 público en `AWS`, que es un contenedor para objetos, estos objetos pueden ser archivos estáticos de un sitio web, datos que se puedan compartir, archivos, etc. 
+
+Script:
+
 ```
 resource "aws_s3_bucket" "bucket_publico" {
   bucket = "bucket-publico-${aws_vpc.istea_vpc.id]"
@@ -193,6 +229,8 @@ resource "aws_s3_bucket" "bucket_publico" {
 
 - Paso 13. Creando recurso Bucket S3 privado en AWS.
 
+Script:
+
 ```
 resource "aws_s3_bucket" "bucket_privado" {
   bucket = "bucket-privado-${aws_vpc.istea_vpc.id}"
@@ -201,6 +239,8 @@ resource "aws_s3_bucket" "bucket_privado" {
 ```
 
 - Paso 14. Definimos politicas de acceso para el bucket S3 público.
+
+Script:
 
 ```
 resource "aws_s3_bucket_policy" "bucket_policy_publico" {
@@ -227,6 +267,8 @@ resource "aws_s3_bucket_policy" "bucket_policy_publico" {
 
 - Paso 15. Definimos politicas de acceso para el bucket S3 privado.
 
+Script:
+
 ```
 resource "aws_s3_bucket_policy" "bucket_policy_privado" {
   bucket = aws_s3_bucket.bucket_privado.id
@@ -252,6 +294,8 @@ resource "aws_s3_bucket_policy" "bucket_policy_privado" {
 ```
 
 - Explicación de politicas de bucket:
-  En ambos casos, la acción que se especifica como `s3:GetObject`, para que las EC2 puedan descargar archivos y otros recursos almacenados en el bucket S3.
-  Además, se aplica una condición para que solo las EC2 que se encuentran en la VPC puedan tener acceso a los buckets, esto nos agrega una cada adicional de seguridad limitando el acceso.
+  En estas politicas de `bucket S3` se permite que cualquier usuario o entidad obtenga objetos del bucket especificado. A su vez se establece una condición donde se restringe este acceso, solamente se va a permitir el acceso a las solicitudes que provengan de la `VPC` que se especifico.
+  
+  
+### Diagrama de flujo
   
