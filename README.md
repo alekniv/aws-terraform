@@ -298,4 +298,6 @@ resource "aws_s3_bucket_policy" "bucket_policy_privado" {
   
   
 ### Diagrama de flujo
+
+  ![flujo](https://github.com/alekniv/aws-terraform/blob/main/graphvix.png)
   
